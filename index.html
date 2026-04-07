@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ExamPrep Rwanda - Senior 6 PCM</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+  <div class="max-w-4xl mx-auto px-6 py-12">
+    <div class="text-center mb-10">
+      <h1 class="text-5xl font-extrabold text-emerald-700 mb-2 tracking-tight">ExamPrep Rwanda</h1>
+      <p class="text-xl text-slate-600">Senior 6 PCM • CBC Curriculum Practice Tests</p>
+    </div>
+
+    <div class="bg-white shadow-2xl rounded-3xl p-8 border border-slate-100">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <label class="block text-sm font-semibold mb-2 text-slate-700 uppercase tracking-wider">Subject</label>
+          <select id="subject" class="w-full border border-slate-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none transition-all bg-slate-50">
+            <option value="Physics">Physics</option>
+            <option value="Chemistry">Chemistry</option>
+            <option value="Mathematics">Mathematics</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-semibold mb-2 text-slate-700 uppercase tracking-wider">No. Questions</label>
+          <input id="numQuestions" type="number" value="10" min="5" max="25" 
+                 class="w-full border border-slate-200 rounded-2xl px-4 py-3 focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50">
+        </div>
+        <div class="flex items-end">
+          <button id="generateBtn"
+                  class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-3xl text-lg flex items-center justify-center gap-3 transition-all transform active:scale-95 shadow-lg shadow-emerald-200">
+            <i class="fas fa-bolt"></i> Generate Test
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div class="bg-white w-full max-w-5xl rounded-3xl shadow-2xl max-h-[92vh] overflow-hidden flex flex-col">
+      <div class="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <h2 class="text-2xl font-bold text-slate-800">Exam Preview</h2>
+        <div class="flex items-center gap-4">
+          <button id="downloadBtn" 
+                  class="flex items-center gap-2 bg-slate-800 text-white px-6 py-2.5 rounded-2xl hover:bg-slate-900 transition-all font-semibold">
+            <i class="fas fa-file-pdf"></i> Download PDF
+          </button>
+          <button id="closeBtn" class="text-3xl text-slate-400 hover:text-slate-600 transition-colors">&times;</button>
+        </div>
+      </div>
+      <div id="test-content" class="p-10 overflow-y-auto flex-1 bg-white"></div>
+    </div>
+  </div>
+
+  <script>
+    const generateBtn = document.getElementById('generateBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const closeBtn = document.getElementById('closeBtn');
+
+    generateBtn.addEventListener('click', generateTest);
+    downloadBtn.addEventListener('click', downloadPDF);
+    closeBtn.addEventListener('click', closeModal);
+
+    async function generateTest() {
+      const subject = document.getElementById('subject').value;
+      const numQuestions = Number(document.getElementById('numQuestions').value) || 10;
+      const content = document.getElementById('test-content');
+      const modal = document.getElementById('modal');
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      content.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-96 text-center">
+          <div class="relative">
+            <div class="w-20 h-20 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
+            <i class="fas fa-book-open absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-emerald-600 text-xl"></i>
+          </div>
+          <p class="text-2xl font-bold text-slate-800 mt-8">Generating ${numQuestions} Questions</p>
+          <p class="text-slate-500 mt-2">Checking Senior 6 PCM ${subject} curriculum...</p>
+        </div>`;
+
+      try {
+        const resp = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subject, numQuestions })
+        });
+
+        if (!resp.ok) {
+          const err = await resp.json().catch(()=>({error:'Unknown error'}));
+          throw new Error(err.error || 'Failed to generate test');
+        }
+
+        const data = await resp.json();
+        // The server returns sanitized HTML in data.html (see server code)
+        const html = data.html || '<p class="text-red-600">No content returned</p>';
+
+        content.innerHTML = `<div class="max-w-3xl mx-auto text-slate-900">${html}</div>`;
+      } catch (e) {
+        content.innerHTML = `
+          <div class="text-center py-12 bg-red-50 rounded-3xl border border-red-100">
+            <h3 class="text-2xl font-bold text-red-800">Error</h3>
+            <p class="text-red-600 mt-2">${e.message}</p>
+          </div>`;
+      }
+    }
+
+    function downloadPDF() {
+      const element = document.getElementById('test-content');
+      const subject = document.getElementById('subject').value;
+      setTimeout(() => {
+        html2pdf().from(element).set({
+          margin: [15, 15],
+          filename: `ExamPrep_S6_${subject}.pdf`,
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).save();
+      }, 300);
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+      document.getElementById('modal').classList.remove('flex');
+    }
+  </script>
+</body>
+</html>
